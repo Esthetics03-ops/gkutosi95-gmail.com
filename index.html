@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gyroscope Time Machine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    <script>
+        let stars = [];
+        let rings = [];
+        let cameraZ = 600;
+        let ringScale;
+        let rotationX = 0;
+        let rotationY = 0;
+        let glowTemperature = 2000; // Initial Temperature (K)
+        let glowIncrement = 500; // Increment per click
+        let temperatureCycle = false; // Temperature cycling toggle
+        let maxTemperature = 15000; // Maximum temperature cap
+        let baseRingSpeed = 1; // Base speed for rings
+        let dynamicSpeedMultiplier = 1; // Speed multiplier based on temperature
+        let colorMap = []; // Array to store 20 unique colors
+        let font; // Font for text
+        let sound; // Howl object for sound
+        let soundStarted = false; // Flag to ensure audio starts after user gesture
+
+        function preload() {
+            // Load a font
+            font = loadFont('https://cdnjs.cloudflare.com/ajax/libs/topcoat/0.8.0/font/SourceCodePro-Light.otf');
+        }
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight, WEBGL);
+            noStroke();
+            angleMode(DEGREES);
+
+            // Set initial ring scale dynamically based on screen size
+            ringScale = min(width, height) / 1000;
+
+            // Create stars for the background
+            for (let i = 0; i < 500; i++) {
+                stars.push(new Star());
+            }
+
+            // Generate 20 unique colors for temperature ranges
+            colorMap = generateColorMap();
+
+            // Define rings
+            rings.push(new Ring(400, color(59, 103, 198), 5));
+            rings.push(new Ring(300, color(130, 116, 201), 3.5));
+            rings.push(new Ring(200, color(217, 182, 224), 1.5));
+
+            // Initialize Howler.js sound
+            sound = new Howl({
+                src: ['https://dl.dropbox.com/scl/fi/xllw1nlo3gxlkatqog44f/Spinning-Riser-With-Time-Warp-Sound-effect-ezmp3.cc.mp3?rlkey=8bvsot603ptbt1cuzep6xzijb&st=vfdaxal1&raw=1'],
+                loop: true,
+                volume: 0.1,
+            });
+        }
+
+        function draw() {
+            background(10);
+            ambientLight(50);
+            pointLight(200, 200, 255, 0, 0, 300);
+
+            // Draw twinkling stars
+            stars.forEach((star) => star.display());
+
+            // Adjust camera
+            translate(0, 0, -cameraZ);
+
+            // Apply user rotations
+            rotateX(rotationX);
+            rotateY(rotationY);
+
+            // Dynamically calculate ring speed based on temperature
+            dynamicSpeedMultiplier = map(glowTemperature, 2000, maxTemperature, 1, 3);
+
+            // Draw rings
+            rings.forEach((ring) => ring.display(ringScale, dynamicSpeedMultiplier));
+
+            // Get glow color based on temperature
+            let glowColor = getGlowColor(glowTemperature);
+
+            // Glowing center sphere
+            push();
+            rotateY(-frameCount * 0.2);
+            ambientMaterial(0, 0, 255, 200);
+            emissiveMaterial(glowColor.levels[0], glowColor.levels[1], glowColor.levels[2], 200);
+            sphere(50 * ringScale);
+
+            // Outer glowing effect
+            noFill();
+            strokeWeight(2);
+            stroke(glowColor);
+            for (let i = 0; i < 3; i++) {
+                rotateY(frameCount * 0.1);
+                sphere(60 + i * 10 * ringScale);
+            }
+            pop();
+
+            // Display temperature
+            displayTemperature(glowTemperature, glowColor);
+
+            // Cycle temperature back to normal if toggled
+            if (temperatureCycle) {
+                glowTemperature = lerp(glowTemperature, 2000, 0.02);
+                if (abs(glowTemperature - 2000) < 1) {
+                    glowTemperature = 2000;
+                    temperatureCycle = false;
+                }
+            }
+
+            // Adjust sound volume and playback rate based on temperature
+            adjustSound();
+        }
+
+        class Ring {
+            constructor(size, ringColor, speed) {
+                this.size = size;
+                this.ringColor = ringColor;
+                this.baseSpeed = speed;
+            }
+
+            display(scale, speedMultiplier) {
+                push();
+                let rotationX = map(frameCount * this.baseSpeed * speedMultiplier, 0, 360, 0, 360);
+                let rotationY = map(frameCount * this.baseSpeed * speedMultiplier, 0, 360, 0, 360);
+                rotateX(rotationX);
+                rotateY(rotationY);
+
+                ambientMaterial(this.ringColor);
+                for (let i = -5; i <= 5; i++) {
+                    push();
+                    translate(0, 0, i * 20 * scale);
+                    torus(this.size * scale, 20 * scale);
+                    pop();
+                }
+                pop();
+            }
+        }
+
+        class Star {
+            constructor() {
+                this.x = random(-width, width);
+                this.y = random(-height, height);
+                this.z = random(-1000, 1000);
+                this.color = color(random(100, 255), random(100, 255), random(100, 255));
+                this.size = random(1, 3);
+            }
+
+            display() {
+                push();
+                translate(this.x, this.y, this.z);
+                fill(this.color);
+                noStroke();
+                let pulse = sin(frameCount * 0.1 + this.z) * 0.5 + 1;
+                ellipse(0, 0, this.size * pulse, this.size * pulse);
+                pop();
+            }
+        }
+
+        function generateColorMap() {
+            let colors = [];
+            for (let i = 0; i < 20; i++) {
+                colors.push(color(random(255), random(255), random(255)));
+            }
+            return colors;
+        }
+
+        function getGlowColor(temp) {
+            let index = map(temp, 2000, maxTemperature, 0, colorMap.length - 1);
+            return colorMap[floor(index)];
+        }
+
+        function displayTemperature(temp, color) {
+            push();
+            translate(-width / 2, -height / 2);
+            fill(255);
+            textSize(24);
+            textFont(font); // Apply loaded font
+            text(`Temperature: ${floor(temp)} K`, 20, 40);
+            noStroke();
+            fill(color);
+            ellipse(20, 80, 20, 20); // Color indicator
+            pop();
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            ringScale = min(width, height) / 1000;
+        }
+
+        function mousePressed() {
+            // Start sound playback on user gesture
+            if (!soundStarted) {
+                sound.play();
+                soundStarted = true;
+            }
+
+            // Increase temperature
+            glowTemperature += glowIncrement;
+            glowTemperature = min(glowTemperature, maxTemperature); // Cap temperature
+
+            if (glowTemperature === maxTemperature) {
+                temperatureCycle = true; // Start cycling back
+            }
+        }
+
+        function adjustSound() {
+            if (sound) {
+                // Scale volume and playback rate according to temperature
+                let volume = map(glowTemperature, 2000, maxTemperature, 0.1, 1);
+                let playbackRate = map(glowTemperature, 2000, maxTemperature, 0.5, 2);
+                sound.volume(volume);
+                sound.rate(playbackRate);
+            }
+        }
+    </script>
+</body>
+</html>
