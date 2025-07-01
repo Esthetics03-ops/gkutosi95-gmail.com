@@ -1,0 +1,19 @@
+/*==== NEON WRAP=====*/
+  a{
+	  
+	  text-decoration:none;
+  }
+    
+         a:hover {
+                 background-color:white;
+                 color: 	#f7ac32;
+		
+                box-shadow: 0 0 5px #fffdfd,
+                            0 0 25px 	#602e9e,
+                            0 0 50px 		#0cdefb,
+                            0 0 200px 		#f7ac32;
+                           
+              -webkit-box-reflect: below 5px linear-gradient(tranparent, #0005);
+             }
+      
+/*====END OF NEON WRAP=====*/
